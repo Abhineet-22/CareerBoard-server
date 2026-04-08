@@ -5,6 +5,7 @@ import dotenv from 'dotenv';
 import jobRoutes from './routes/jobs.js';
 import applicationRoutes from './routes/applications.js';
 import authRoutes from './routes/auth.js';
+import { apiLimiter } from './middleware/rateLimit.js';
 import fs from 'fs';
 if (!fs.existsSync('uploads')) fs.mkdirSync('uploads');
 
@@ -14,6 +15,7 @@ const app = express();
 const allowedOrigin = process.env.CORS_ORIGIN || 'http://localhost:5173';
 app.use(cors({ origin: allowedOrigin }));
 app.use(express.json());
+app.use('/api', apiLimiter);
 
 app.use('/api/jobs', jobRoutes);
 app.use('/api/applications', applicationRoutes);

@@ -5,8 +5,11 @@ import { body, validationResult } from 'express-validator';
 import Candidate from '../models/Candidate.js';
 import Recruiter from '../models/Recruiter.js';
 import { requireAuth } from '../middleware/auth.js';
+import { authLimiter } from '../middleware/rateLimit.js';
 
 const router = express.Router();
+
+router.use(authLimiter);
 
 const modelByRole = {
   Candidate,
