@@ -8,12 +8,37 @@ const router = express.Router();
 // GET /api/jobs — list with optional filters
 router.get('/', async (req, res) => {
   try {
-    const { category, location, experience, type, q } = req.query;
+    const { category, location, experience, type, q, workArrangement, arrangement } = req.query;
     const filter = {};
-    if (category)   filter.category = category;
+
+    const parseValues = (value) => {
+      if (!value) return [];
+      if (Array.isArray(value)) {
+        return value
+          .flatMap(v => String(v).split(','))
+          .map(v => v.trim())
+          .filter(Boolean);
+      }
+      return String(value)
+        .split(',')
+        .map(v => v.trim())
+        .filter(Boolean);
+    };
+
+    const categoryValues = parseValues(category);
+    const experienceValues = parseValues(experience);
+    const typeValues = parseValues(type);
+    const arrangementValues = parseValues(workArrangement || arrangement);
+
+    if (categoryValues.length === 1)   filter.category = categoryValues[0];
+    if (categoryValues.length > 1)     filter.category = { $in: categoryValues };
     if (location)   filter.location = new RegExp(location, 'i');
-    if (experience) filter.experienceLevel = experience;
-    if (type)       filter.jobType = type;
+    if (experienceValues.length === 1) filter.experienceLevel = experienceValues[0];
+    if (experienceValues.length > 1)   filter.experienceLevel = { $in: experienceValues };
+    if (typeValues.length === 1)       filter.jobType = typeValues[0];
+    if (typeValues.length > 1)         filter.jobType = { $in: typeValues };
+    if (arrangementValues.length === 1) filter.workArrangement = arrangementValues[0];
+    if (arrangementValues.length > 1)   filter.workArrangement = { $in: arrangementValues };
     if (q)          filter.$or = [
       { jobTitle:     new RegExp(q, 'i') },
       { companyName:  new RegExp(q, 'i') },
