@@ -6,7 +6,7 @@ import { requireAuth, requireRole } from '../middleware/auth.js';
 const router = express.Router();
 
 // GET /api/jobs — list with optional filters
-router.get('/', async (req, res) => {
+router.get('/', requireAuth, requireRole('Candidate'), async (req, res) => {
   try {
     const { category, location, experience, type, q, workArrangement, arrangement } = req.query;
     const filter = {};
@@ -52,6 +52,16 @@ router.get('/', async (req, res) => {
   }
 });
 
+// GET /api/jobs/mine — list jobs posted by signed-in recruiter
+router.get('/mine', requireAuth, requireRole('Recruiter'), async (req, res) => {
+  try {
+    const jobs = await Job.find({ recruiterId: req.user.id }).sort({ createdAt: -1 });
+    res.json(jobs);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // POST /api/jobs — create a new job
 router.post('/', requireAuth, requireRole('Recruiter'), [
   body('companyName').trim().isLength({ min: 2, max: 80 }),
@@ -67,10 +77,83 @@ router.post('/', requireAuth, requireRole('Recruiter'), [
   if (!errors.isEmpty()) return res.status(400).json({ errors: errors.array() });
 
   try {
-    const job = await Job.create(req.body);
+    const job = await Job.create({
+      ...req.body,
+      recruiterId: req.user.id,
+    });
     res.status(201).json(job);
   } catch (err) {
     res.status(500).json({ error: err.message });
+  }
+});
+
+// PUT /api/jobs/:id — update a recruiter's own posted job
+router.put('/:id', requireAuth, requireRole('Recruiter'), [
+  body('companyName').optional().trim().isLength({ min: 2, max: 80 }),
+  body('contactEmail').optional().isEmail(),
+  body('jobTitle').optional().trim().isLength({ min: 3, max: 120 }),
+  body('description').optional().trim().isLength({ min: 80, max: 1200 }),
+  body('location').optional().trim().isLength({ min: 2, max: 120 }),
+  body('notes').optional({ values: 'falsy' }).trim().isLength({ max: 500 }),
+  body('skills').optional().isArray({ min: 1 }),
+  body('skills.*').optional().trim().isLength({ min: 1, max: 40 }),
+], async (req, res) => {
+  const errors = validationResult(req);
+  if (!errors.isEmpty()) return res.status(400).json({ errors: errors.array() });
+
+  try {
+    const job = await Job.findById(req.params.id);
+    if (!job) return res.status(404).json({ error: 'Job not found.' });
+    if (String(job.recruiterId) !== req.user.id) {
+      return res.status(403).json({ error: 'You can update only your own jobs.' });
+    }
+
+    const updatableFields = [
+      'companyName',
+      'website',
+      'industry',
+      'companySize',
+      'contactEmail',
+      'jobTitle',
+      'category',
+      'experienceLevel',
+      'description',
+      'skills',
+      'jobType',
+      'workArrangement',
+      'location',
+      'salaryMin',
+      'salaryMax',
+      'currency',
+      'notes',
+    ];
+
+    updatableFields.forEach((key) => {
+      if (Object.prototype.hasOwnProperty.call(req.body, key)) {
+        job[key] = req.body[key];
+      }
+    });
+
+    await job.save();
+    return res.json(job);
+  } catch (err) {
+    return res.status(500).json({ error: err.message });
+  }
+});
+
+// DELETE /api/jobs/:id — delete a recruiter's own posted job
+router.delete('/:id', requireAuth, requireRole('Recruiter'), async (req, res) => {
+  try {
+    const job = await Job.findById(req.params.id);
+    if (!job) return res.status(404).json({ error: 'Job not found.' });
+    if (String(job.recruiterId) !== req.user.id) {
+      return res.status(403).json({ error: 'You can delete only your own jobs.' });
+    }
+
+    await Job.deleteOne({ _id: job._id });
+    return res.json({ message: 'Job deleted successfully.' });
+  } catch (err) {
+    return res.status(500).json({ error: err.message });
   }
 });
 
