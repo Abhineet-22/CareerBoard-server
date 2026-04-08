@@ -54,11 +54,14 @@ router.get('/', async (req, res) => {
 
 // POST /api/jobs — create a new job
 router.post('/', requireAuth, requireRole('Recruiter'), [
-  body('companyName').notEmpty(),
+  body('companyName').trim().isLength({ min: 2, max: 80 }),
   body('contactEmail').isEmail(),
-  body('jobTitle').notEmpty(),
-  body('description').isLength({ min: 80 }),
+  body('jobTitle').trim().isLength({ min: 3, max: 120 }),
+  body('description').trim().isLength({ min: 80, max: 1200 }),
+  body('location').trim().isLength({ min: 2, max: 120 }),
+  body('notes').optional({ values: 'falsy' }).trim().isLength({ max: 500 }),
   body('skills').isArray({ min: 1 }),
+  body('skills.*').trim().isLength({ min: 1, max: 40 }),
 ], async (req, res) => {
   const errors = validationResult(req);
   if (!errors.isEmpty()) return res.status(400).json({ errors: errors.array() });
