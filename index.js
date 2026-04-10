@@ -12,8 +12,27 @@ if (!fs.existsSync('uploads')) fs.mkdirSync('uploads');
 dotenv.config();
 const app = express();
 
-const allowedOrigin = process.env.CORS_ORIGIN || 'http://localhost:5173';
-app.use(cors({ origin: allowedOrigin }));
+const configuredOrigins = (process.env.CORS_ORIGIN || '')
+  .split(',')
+  .map(origin => origin.trim())
+  .filter(Boolean);
+
+const allowedOrigins = new Set([
+  'http://localhost:5173',
+  'https://career-board-client.vercel.app',
+  ...configuredOrigins,
+]);
+
+app.use(cors({
+  origin(origin, callback) {
+    if (!origin || allowedOrigins.has(origin)) {
+      callback(null, true);
+      return;
+    }
+
+    callback(new Error('Not allowed by CORS'));
+  },
+}));
 app.use(express.json());
 app.use('/api', apiLimiter);
 

@@ -6,8 +6,12 @@ import { requireAuth, requireRole } from '../middleware/auth.js';
 const router = express.Router();
 
 // GET /api/jobs — list with optional filters
-router.get('/', requireAuth, requireRole('Candidate'), async (req, res) => {
+router.get('/', requireAuth, async (req, res) => {
   try {
+    if (req.user.role !== 'Candidate' && req.user.role !== 'Recruiter') {
+      return res.status(403).json({ error: 'Only Candidate or Recruiter users can view jobs.' });
+    }
+
     const { category, location, experience, type, q, workArrangement, arrangement } = req.query;
     const filter = {};
 
@@ -44,6 +48,10 @@ router.get('/', requireAuth, requireRole('Candidate'), async (req, res) => {
       { companyName:  new RegExp(q, 'i') },
       { skills:       new RegExp(q, 'i') },
     ];
+
+    if (req.user.role === 'Recruiter') {
+      filter.recruiterId = req.user.id;
+    }
 
     const jobs = await Job.find(filter).sort({ createdAt: -1 });
     res.json(jobs);
