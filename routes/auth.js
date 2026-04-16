@@ -4,6 +4,7 @@ import jwt from 'jsonwebtoken';
 import { body, validationResult } from 'express-validator';
 import Candidate from '../models/Candidate.js';
 import Recruiter from '../models/Recruiter.js';
+import Admin from '../models/Admin.js';
 import { requireAuth } from '../middleware/auth.js';
 import { authLimiter } from '../middleware/rateLimit.js';
 
@@ -14,13 +15,16 @@ router.use(authLimiter);
 const modelByRole = {
   Candidate,
   Recruiter,
+  Admin,
 };
 
 async function findUserByEmail(email) {
   const normalizedEmail = email.toLowerCase();
   const candidate = await Candidate.findOne({ email: normalizedEmail });
   if (candidate) return candidate;
-  return Recruiter.findOne({ email: normalizedEmail });
+  const recruiter = await Recruiter.findOne({ email: normalizedEmail });
+  if (recruiter) return recruiter;
+  return Admin.findOne({ email: normalizedEmail });
 }
 
 function signToken(user) {
@@ -35,14 +39,20 @@ router.post('/register', [
   body('name').trim().isLength({ min: 2 }),
   body('email').isEmail(),
   body('password').isLength({ min: 6 }),
-  body('role').isIn(['Candidate', 'Recruiter']),
+  body('role').isIn(['Candidate', 'Recruiter', 'Admin']),
 ], async (req, res) => {
   const errors = validationResult(req);
   if (!errors.isEmpty()) return res.status(400).json({ errors: errors.array() });
 
   try {
-    const { name, email, password, role } = req.body;
+    const { name, email, password, role, adminSecret } = req.body;
     const Model = modelByRole[role];
+    if (!Model) return res.status(400).json({ error: 'Invalid role.' });
+    if (role === 'Admin') {
+      if (!process.env.ADMIN_SECRET) return res.status(500).json({ error: 'Admin registration not configured.' });
+      if (adminSecret !== process.env.ADMIN_SECRET) return res.status(403).json({ error: 'Invalid admin creation secret.' });
+    }
+
     const existing = await findUserByEmail(email);
     if (existing) return res.status(409).json({ error: 'Email already registered.' });
 

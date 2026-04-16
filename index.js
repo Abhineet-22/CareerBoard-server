@@ -5,6 +5,7 @@ import dotenv from 'dotenv';
 import jobRoutes from './routes/jobs.js';
 import applicationRoutes from './routes/applications.js';
 import authRoutes from './routes/auth.js';
+import adminRoutes from './routes/admin.js';
 import { apiLimiter } from './middleware/rateLimit.js';
 import fs from 'fs';
 if (!fs.existsSync('uploads')) fs.mkdirSync('uploads');
@@ -39,6 +40,7 @@ app.use('/api', apiLimiter);
 app.use('/api/jobs', jobRoutes);
 app.use('/api/applications', applicationRoutes);
 app.use('/api/auth', authRoutes);
+app.use('/api/admin', adminRoutes);
 
 // mongoose
 //   .connect(process.env.MONGO_URI)
